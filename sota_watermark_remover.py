@@ -18,6 +18,8 @@ import logging
 from typing import Dict, List, Tuple, Any, Optional
 import warnings
 warnings.filterwarnings('ignore')
+from audio_processing_fixes import AudioProcessingFixes, WatermarkRemovalFixes
+
 
 logger = logging.getLogger(__name__)
 
@@ -59,11 +61,11 @@ class StateOfTheArtWatermarkRemover:
                 "compression_bitrates": [32, 64],
             },
             "conservative": {
-                "pitch_shift_cents": [10, 25],
-                "time_stretch_factors": [0.95, 1.05],
+                "pitch_shift_cents": [5, 10],
+                "time_stretch_factors": [0.98, 1.02],
                 "high_pass_cutoffs": [100, 200],
                 "low_pass_cutoffs": [5000, 8000],
-                "sample_suppression_rates": [0.001, 0.005],
+                "sample_suppression_rates": [0.0005, 0.001],
                 "resampling_rates": [16000, 22050],
                 "noise_snr_db": [40, 50],
                 "compression_bitrates": [64, 128],
@@ -146,19 +148,26 @@ class StateOfTheArtWatermarkRemover:
         return result
     
     def _validate_and_normalize_audio(self, audio: np.ndarray) -> np.ndarray:
-        """Validate and normalize audio input."""
-        # Handle NaN and infinite values
-        audio = np.nan_to_num(audio, nan=0.0, posinf=0.0, neginf=0.0)
+        """Validate and normalize audio input with enhanced safety."""
+        # Use enhanced NaN cleanup
+        audio = AudioProcessingFixes.safe_nan_cleanup(audio)
+        
+        # Validate audio content
+        if not AudioProcessingFixes.validate_audio_content(audio, context="SOTA input validation"):
+            logger.error("Input audio validation failed")
+            raise ValueError("Invalid audio input")
         
         # Convert to mono if stereo
         if len(audio.shape) > 1:
             audio = np.mean(audio, axis=0)
         
         # Normalize to prevent clipping
-        if np.max(np.abs(audio)) > 0:
-            audio = audio / np.max(np.abs(audio)) * 0.95
+        max_val = np.max(np.abs(audio))
+        if max_val > 0:
+            audio = audio / max_val * 0.95
         
         return audio
+
     
     def _compute_psychoacoustic_masking(self, audio: np.ndarray, sr: int) -> np.ndarray:
         """Compute psychoacoustic masking threshold for quality preservation."""
@@ -293,16 +302,22 @@ class StateOfTheArtWatermarkRemover:
     
     def _apply_sample_suppression_attack(self, audio: np.ndarray, sr: int, 
                                         masking_threshold: np.ndarray) -> np.ndarray:
-        """Apply sample suppression attack - sets random samples to zero."""
+        """Apply sample suppression attack - reduces amplitude of random samples."""
         params = self.attack_params[self.quality_mode]
         
         suppression_rate = np.random.choice(params["sample_suppression_rates"])
         
-        # Create random mask
-        mask = np.random.random(len(audio)) > suppression_rate
+        # Instead of zeroing, reduce amplitude
+        result = audio.copy()
         
-        # Apply suppression
-        result = audio * mask
+        # Create random indices for suppression
+        num_samples_to_suppress = int(len(audio) * suppression_rate)
+        if num_samples_to_suppress > 0:
+            suppress_indices = np.random.choice(len(audio), num_samples_to_suppress, replace=False)
+            
+            # Reduce amplitude instead of zeroing (preserve some signal)
+            suppression_factor = 0.1  # Reduce to 10% instead of 0%
+            result[suppress_indices] *= suppression_factor
         
         return result
     

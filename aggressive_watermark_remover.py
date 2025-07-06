@@ -11,6 +11,8 @@ from scipy import stats
 from scipy.fft import fft, ifft, fftfreq
 import logging
 from typing import Dict, List, Tuple, Any, Optional
+from audio_processing_fixes import AudioProcessingFixes
+
 
 logger = logging.getLogger(__name__)
 
@@ -20,21 +22,21 @@ class AggressiveWatermarkRemover:
     def __init__(self):
         # Balanced removal parameters that preserve audio quality
         self.removal_strength = {
-            'frequency_notch': 0.30,  # Remove 30% of energy in watermark frequencies
-            'spectral_gating': 0.25,  # Light spectral gating
-            'temporal_smoothing': 0.2,  # Light temporal smoothing
-            'phase_randomization': 0.15,  # Very light phase randomization
-            'pattern_disruption': 0.4,  # Focus on pattern disruption instead
+            'frequency_notch': 0.10,  # Reduced from 0.15
+            'spectral_gating': 0.05,  # Reduced from 0.10
+            'temporal_smoothing': 0.05,  # Reduced from 0.1
+            'phase_randomization': 0.02,  # Reduced from 0.05
+            'pattern_disruption': 0.10,  # Reduced from 0.2
         }
         
         # Suno-specific frequency ranges for aggressive removal
         self.suno_removal_ranges = [
-            (19000, 20000, 0.80),  # Ultrasonic - aggressive but safe
-            (17500, 18500, 0.70),  # Extended high - moderate
-            (15000, 16000, 0.60),  # Mid-high - moderate
-            (12000, 12500, 0.50),  # Secondary - conservative
-            (8000, 8500, 0.40),    # Mid-range - conservative
-            (50, 200, 0.30),       # Low-freq - very conservative
+            (19000, 20000, 0.40),  # Ultrasonic - moderate (reduced from 0.80)
+            (17500, 18500, 0.35),  # Extended high - light (reduced from 0.70)
+            (15000, 16000, 0.30),  # Mid-high - light (reduced from 0.60)
+            (12000, 12500, 0.25),  # Secondary - very light (reduced from 0.50)
+            (8000, 8500, 0.20),    # Mid-range - minimal (reduced from 0.40)
+            (50, 200, 0.15),       # Low-freq - ultra conservative (reduced from 0.30)
         ]
     
     def remove_watermarks_aggressive(self, audio: np.ndarray, sr: int, 
@@ -119,61 +121,9 @@ class AggressiveWatermarkRemover:
         return result
     
     def _safe_nan_cleanup(self, processed_audio: np.ndarray, fallback_audio: np.ndarray) -> np.ndarray:
-        """Safely clean NaN/inf values without zeroing the entire signal."""
-        # Check for NaN/inf values
-        has_nan = np.any(np.isnan(processed_audio))
-        has_inf = np.any(np.isinf(processed_audio))
-        
-        if not (has_nan or has_inf):
-            return processed_audio  # No cleanup needed
-        
-        logger.warning(f"Cleaning NaN/inf values: NaN={has_nan}, Inf={has_inf}")
-        
-        # Create mask for valid samples
-        valid_mask = np.isfinite(processed_audio)
-        
-        # If we have valid samples, only replace invalid ones
-        if np.any(valid_mask):
-            result = processed_audio.copy()
-            
-            # Replace NaN/inf with interpolated values from nearby valid samples
-            if has_nan or has_inf:
-                invalid_indices = ~valid_mask
-                if np.sum(invalid_indices) < len(processed_audio) * 0.5:  # Less than 50% invalid
-                    # Linear interpolation for scattered invalid samples
-                    valid_indices = np.where(valid_mask)[0]
-                    invalid_indices_pos = np.where(invalid_indices)[0]
-                    
-                    for invalid_idx in invalid_indices_pos:
-                        # Find nearest valid samples
-                        left_valid = valid_indices[valid_indices < invalid_idx]
-                        right_valid = valid_indices[valid_indices > invalid_idx]
-                        
-                        if len(left_valid) > 0 and len(right_valid) > 0:
-                            # Interpolate between nearest valid samples
-                            left_idx = left_valid[-1]
-                            right_idx = right_valid[0]
-                            alpha = (invalid_idx - left_idx) / (right_idx - left_idx)
-                            result[invalid_idx] = (1 - alpha) * result[left_idx] + alpha * result[right_idx]
-                        elif len(left_valid) > 0:
-                            # Use nearest left sample
-                            result[invalid_idx] = result[left_valid[-1]]
-                        elif len(right_valid) > 0:
-                            # Use nearest right sample
-                            result[invalid_idx] = result[right_valid[0]]
-                        else:
-                            # Last resort - use fallback
-                            result[invalid_idx] = fallback_audio[invalid_idx] if invalid_idx < len(fallback_audio) else 0.0
-                else:
-                    # Too many invalid samples, return fallback
-                    logger.warning("Too many invalid samples, using fallback audio")
-                    return fallback_audio
-            
-            return result
-        else:
-            # All samples are invalid, return fallback
-            logger.warning("All samples invalid, using fallback audio")
-            return fallback_audio
+        """Use enhanced NaN cleanup from AudioProcessingFixes."""
+        return AudioProcessingFixes.safe_nan_cleanup(processed_audio, fallback_audio)
+
     
     def _aggressive_frequency_removal(self, audio: np.ndarray, sr: int, 
                                     watermarks: List[Dict[str, Any]]) -> np.ndarray:
