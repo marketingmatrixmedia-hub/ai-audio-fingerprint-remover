@@ -1,0 +1,15 @@
+# Development and Testing Requirements
+# AI Audio Fingerprint Remover
+# Updated: 2026-01-19
+
+# Include all core requirements
+-r requirements-core.txt
+
+# Visualization for analysis and testing tools
+matplotlib~=3.9.0
+
+# Development tools (optional additions)
+# pytest~=8.0.0        # For unit testing
+# pip-audit~=2.10.0    # For security scanning
+# black~=24.0.0        # For code formatting
+# flake8~=7.0.0        # For linting
