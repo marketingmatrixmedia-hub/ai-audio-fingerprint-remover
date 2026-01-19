@@ -1,0 +1,9 @@
+# Core Production Requirements (Minimal Installation)
+# AI Audio Fingerprint Remover
+# Updated: 2026-01-19
+
+numpy~=2.0.0
+scipy~=1.14.0
+librosa~=0.11.0
+soundfile~=0.13.0
+mutagen~=1.47.0
