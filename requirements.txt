@@ -1,6 +1,11 @@
-numpy>=1.20.0
-scipy>=1.7.0
-librosa>=0.9.0
-soundfile>=0.10.3
-mutagen>=1.45.0
-matplotlib>=3.4.0  # For visualization if needed
+# Updated: 2026-09-20
+# Modern dependency versions with compatible release pinning
+
+numpy~=2.0.0      # Was: >=1.20.0 | Upgraded for performance and Python 3.11-3.14 support
+scipy~=1.14.0     # Was: >=1.7.0  | Upgraded for signal processing improvements
+librosa~=0.11.0   # Was: >=0.9.0  | Upgraded for audio processing enhancements
+soundfile~=0.13.0 # Was: >=0.10.3 | Upgraded for I/O improvements
+mutagen~=1.47.0   # Was: >=1.45.0 | Upgraded for metadata handling
+
+# Optional: For visualization/testing tools only
+# matplotlib~=3.9.0  # Was: >=3.4.0
